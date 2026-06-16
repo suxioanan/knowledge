@@ -26,15 +26,18 @@ public class QAController {
     private final MultiTurnQAService multiTurnQAService;
     private final RAGEvaluator evaluator;
     private final ObjectProvider<ChatClient> agentChatClientProvider;
+    private final ObjectProvider<ChatClient> unifiedChatClientProvider;
 
     public QAController(QAService qaService,
                          MultiTurnQAService multiTurnQAService,
                          RAGEvaluator evaluator,
-                         @Qualifier("agentChatClient") ObjectProvider<ChatClient> agentChatClientProvider) {
+                         @Qualifier("agentChatClient") ObjectProvider<ChatClient> agentChatClientProvider,
+                         @Qualifier("unifiedChatClient") ObjectProvider<ChatClient> unifiedChatClientProvider) {
         this.qaService = qaService;
         this.multiTurnQAService = multiTurnQAService;
         this.evaluator = evaluator;
         this.agentChatClientProvider = agentChatClientProvider;
+        this.unifiedChatClientProvider = unifiedChatClientProvider;
     }
 
     // ==================== 单轮问答 ====================
@@ -141,6 +144,47 @@ public class QAController {
         }
         return agentClient.prompt()
             .user(request.getMessage())
+            .stream()
+            .content()
+            .map(chunk -> ServerSentEvent.<String>builder().data(chunk).build())
+            .concatWithValues(
+                ServerSentEvent.<String>builder().event("done").data("[DONE]").build());
+    }
+
+    // ==================== 全能 AI（RAG + Agent 合体） ====================
+
+    /**
+     * 全能问答 — LLM 同时拥有知识库上下文 + 工具调用能力，自主决定用哪个。
+     * 需 app.agent.enabled=true。
+     */
+    @PostMapping("/ask/ai")
+    public ResponseEntity<AnswerResponse> askAi(@RequestBody QuestionRequest request) {
+        ChatClient client = unifiedChatClientProvider.getIfAvailable();
+        if (client == null) {
+            return ResponseEntity.ok(new AnswerResponse(
+                "AI 功能未启用。请在 application.yml 中设置 app.agent.enabled=true"));
+        }
+        String answer = client.prompt()
+            .user(request.getQuestion())
+            .call()
+            .content();
+        return ResponseEntity.ok(new AnswerResponse(answer));
+    }
+
+    /**
+     * 全能问答 — 流式
+     */
+    @PostMapping(value = "/ask/ai-stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<ServerSentEvent<String>> askAiStream(@RequestBody QuestionRequest request) {
+        ChatClient client = unifiedChatClientProvider.getIfAvailable();
+        if (client == null) {
+            return Flux.just(
+                ServerSentEvent.<String>builder()
+                    .data("AI 功能未启用。请在 application.yml 中设置 app.agent.enabled=true")
+                    .build());
+        }
+        return client.prompt()
+            .user(request.getQuestion())
             .stream()
             .content()
             .map(chunk -> ServerSentEvent.<String>builder().data(chunk).build())
