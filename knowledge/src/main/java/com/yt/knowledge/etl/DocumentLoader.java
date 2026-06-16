@@ -1,5 +1,6 @@
 package com.yt.knowledge.etl;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.reader.TextReader;
 import org.springframework.ai.reader.pdf.ParagraphPdfDocumentReader;
@@ -14,7 +15,10 @@ import java.util.*;
 import java.util.stream.Stream;
 
 @Component
+@RequiredArgsConstructor
 public class DocumentLoader {
+
+    private final MarkdownCleaner markdownCleaner;
 
     private static final Set<String> SUPPORTED_EXTENSIONS =
             Set.of("pdf", "docx", "doc", "md", "txt", "ppt", "pptx", "xls", "xlsx", "html");
@@ -22,30 +26,30 @@ public class DocumentLoader {
     private static final Set<String> EXCLUDE_DIRS =
             Set.of("archive", ".git", "node_modules");
 
-    /**
-     * 扫描目录，按文件类型分发到对应的 Reader
-     */
-    public List<Document> loadFromDirectory(String dirPath) throws IOException {
-        List<Document> allDocuments = new ArrayList<>();
-
-        try (Stream<Path> paths = Files.walk(Paths.get(dirPath))) {
-            paths.filter(Files::isRegularFile)
-                 .filter(this::isSupported)
-                 .filter(this::notExcluded)
-                 .forEach(file -> {
-                     try {
-                         List<Document> docs = loadFile(file.toFile().getAbsolutePath());
-                         allDocuments.addAll(docs);
-                         System.out.printf("✓ 已加载: %s (%d 段)%n",
-                                 file.getFileName(), docs.size());
-                     } catch (Exception e) {
-                         System.err.printf("✗ 加载失败: %s — %s%n",
-                                 file.getFileName(), e.getMessage());
-                     }
-                 });
-        }
-        return allDocuments;
-    }
+//    /**
+//     * 扫描目录，按文件类型分发到对应的 Reader
+//     */
+//    public List<Document> loadFromDirectory(String dirPath) throws IOException {
+//        List<Document> allDocuments = new ArrayList<>();
+//
+//        try (Stream<Path> paths = Files.walk(Paths.get(dirPath))) {
+//            paths.filter(Files::isRegularFile)
+//                 .filter(this::isSupported)
+//                 .filter(this::notExcluded)
+//                 .forEach(file -> {
+//                     try {
+//                         List<Document> docs = loadFile(file.toFile().getAbsolutePath());
+//                         allDocuments.addAll(docs);
+//                         System.out.printf("✓ 已加载: %s (%d 段)%n",
+//                                 file.getFileName(), docs.size());
+//                     } catch (Exception e) {
+//                         System.err.printf("✗ 加载失败: %s — %s%n",
+//                                 file.getFileName(), e.getMessage());
+//                     }
+//                 });
+//        }
+//        return allDocuments;
+//    }
 
     /**
      * 加载单个文件
@@ -58,7 +62,16 @@ public class DocumentLoader {
             case "pdf" -> new ParagraphPdfDocumentReader(resource).get();
             case "docx", "doc", "ppt", "pptx", "xls", "xlsx", "html" ->
                     new TikaDocumentReader(resource).get();
-            case "md", "txt" -> new TextReader(resource).get();
+            case "md" -> {
+                List<Document> docs = new TextReader(resource).get();
+                for (int i = 0; i < docs.size(); i++) {
+                    Document doc = docs.get(i);
+                    String cleaned = markdownCleaner.clean(doc.getText());
+                    docs.set(i, new Document(cleaned, doc.getMetadata()));
+                }
+                yield docs;
+            }
+            case "txt" -> new TextReader(resource).get();
             default -> throw new IllegalArgumentException("不支持的文件格式: " + ext);
         };
     }

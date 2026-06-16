@@ -1,6 +1,6 @@
 package com.yt.knowledge.controller;
 
-import com.yt.knowledge.service.SyncResult;
+import com.yt.knowledge.model.SyncResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;

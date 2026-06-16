@@ -1,6 +1,6 @@
 package com.yt.knowledge.controller;
 
-import com.yt.knowledge.service.ImportResult;
+import com.yt.knowledge.model.ImportResult;
 import com.yt.knowledge.service.KnowledgeImportService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;

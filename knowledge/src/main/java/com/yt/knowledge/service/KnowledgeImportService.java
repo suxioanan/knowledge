@@ -4,6 +4,7 @@ import com.yt.knowledge.etl.ChunkSplitter;
 import com.yt.knowledge.etl.DocumentCleaner;
 import com.yt.knowledge.etl.DocumentLoader;
 import com.yt.knowledge.etl.MetadataEnricher;
+import com.yt.knowledge.model.ImportResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;

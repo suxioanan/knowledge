@@ -1,4 +1,4 @@
-package com.yt.knowledge.service;
+package com.yt.knowledge.model;
 
 import lombok.Data;
 

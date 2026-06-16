@@ -67,6 +67,15 @@ public class QAController {
         return ResponseEntity.ok(new AnswerResponse(answer));
     }
 
+    /**
+     * 增强问答 — 检索时自动扩展相邻 Chunk 上下文（长文档效果更好）
+     */
+    @PostMapping("/ask/enhanced")
+    public ResponseEntity<AnswerResponse> askEnhanced(@RequestBody QuestionRequest request) {
+        String answer = qaService.askWithNeighborContext(request.getQuestion());
+        return ResponseEntity.ok(new AnswerResponse(answer));
+    }
+
     // ==================== 多轮对话 ====================
 
     /**

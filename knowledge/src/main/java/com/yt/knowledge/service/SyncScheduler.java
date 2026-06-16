@@ -1,5 +1,6 @@
 package com.yt.knowledge.service;
 
+import com.yt.knowledge.model.SyncResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
