@@ -12,15 +12,43 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * RAG 核心配置。
+ * <p>
+ * 组装 RAG 管线的三大组件：
+ * </p>
+ * <ol>
+ *   <li><b>QdrantVectorStore</b>：向量存储（自定义 Bean，覆盖 Spring AI 自动配置）</li>
+ *   <li><b>QuestionAnswerAdvisor</b>：检索 + 增强 Prompt + 生成的自动 RAG Advisor</li>
+ *   <li><b>ChatClient</b>：带着 Advisor 的聊天客户端（同时具备 RAG + 多轮对话能力）</li>
+ * </ol>
+ *
+ * <p>
+ * Prompt 模板包含 10 条核心规则（6 条知识规则 + 4 条安全规则），
+ * 严格限制 LLM 只能基于知识库内容回答，防止幻觉和 Prompt Injection。
+ * </p>
+ */
 @Configuration
 public class RagConfig {
 
+    /** 向量检索返回的最大结果数（默认 5） */
     @Value("${app.retrieval.top-k:5}")
     private int topK;
 
+    /** 向量检索的相似度阈值（默认 0.7） */
     @Value("${app.retrieval.similarity-threshold:0.7}")
     private double similarityThreshold;
 
+    /**
+     * 创建 QuestionAnswerAdvisor（RAG 核心自动问答 Advisor）。
+     * <p>
+     * 每次用户提问时自动执行：向量检索 → 将检索结果注入 Prompt → 调用 LLM 生成回答。
+     * 包含自定义的中文严格 Prompt 模板和安全防护规则。
+     * </p>
+     *
+     * @param vectorStore 向量存储（由同名 Bean 提供）
+     * @return 配置好的 QuestionAnswerAdvisor
+     */
     @Bean
     public QuestionAnswerAdvisor questionAnswerAdvisor(VectorStore vectorStore) {
         SearchRequest searchRequest = SearchRequest.builder()
@@ -60,6 +88,24 @@ public class RagConfig {
             .build();
     }
 
+    /**
+     * 创建 ChatClient（RAG + 多轮对话）。
+     * <p>
+     * 默认挂载两个 Advisor：
+     * </p>
+     * <ul>
+     *   <li>{@code QuestionAnswerAdvisor}：自动检索 + 生成（优先级高）</li>
+     *   <li>{@code MessageChatMemoryAdvisor}：多轮对话记忆（需要时通过 param 传入 conversationId）</li>
+     * </ul>
+     * <p>
+     * Advisor 链的执行顺序：QuestionAnswerAdvisor 先执行（修改 Prompt），MessageChatMemoryAdvisor 后执行（注入历史）。
+     * </p>
+     *
+     * @param builder       ChatClient 构建器（Spring AI 自动注入）
+     * @param qaAdvisor     RAG 问答 Advisor
+     * @param memoryAdvisor 多轮对话记忆 Advisor
+     * @return 配置好的 ChatClient
+     */
     @Bean
     public ChatClient chatClient(ChatClient.Builder builder,
                                   QuestionAnswerAdvisor qaAdvisor,
@@ -70,8 +116,17 @@ public class RagConfig {
     }
 
     /**
-     * QdrantVectorStore 自定义 Bean。
-     * HNSW 检索 ef 参数在 Qdrant 服务端配置（创建 collection 时设置 hnsw_config.ef_construct），客户端无需重复设置。
+     * 创建 QdrantVectorStore（自定义 Bean，覆盖 Spring AI 自动配置）。
+     * <p>
+     * HNSW 检索参数（ef）由 Qdrant 服务端在创建 collection 时通过 hnsw_config.ef_construct 配置，
+     * 客户端无需重复设置。
+     * </p>
+     *
+     * @param qdrantClient      Qdrant gRPC 客户端（Spring AI 自动配置）
+     * @param embeddingModel    Embedding 模型（Ollama BGE-M3，Spring AI 自动配置）
+     * @param collectionName    Collection 名称（默认 "knowledge"）
+     * @param initializeSchema  是否自动建表（默认 true）
+     * @return 配置好的 QdrantVectorStore
      */
     @Bean
     public QdrantVectorStore qdrantVectorStore(QdrantClient qdrantClient,

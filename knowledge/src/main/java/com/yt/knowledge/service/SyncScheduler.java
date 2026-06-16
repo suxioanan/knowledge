@@ -9,6 +9,18 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 
+/**
+ * 定时增量同步调度器。
+ * <p>
+ * 在配置 {@code app.sync.enabled=true} 时启用，默认每天凌晨 3:00 执行一次，
+ * 扫描 {@code docs/} 目录检测文件变更并自动同步到向量库。
+ * </p>
+ *
+ * <p>
+ * Cron 表达式可通过 {@code app.sync.cron} 配置自定义，默认为 {@code 0 0 3 * * *}。
+ * 手动同步可通过 {@code POST /api/knowledge/admin/sync?dir=docs} 触发。
+ * </p>
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -17,6 +29,15 @@ public class SyncScheduler {
 
     private final IncrementalSyncService syncService;
 
+    /**
+     * 夜间定时增量同步任务。
+     * <p>
+     * 扫描 docs 目录，对比 MD5 哈希检测文件变更（新增/修改/删除），
+     * 自动同步到 Qdrant 向量库。
+     * </p>
+     *
+     * @throws IOException 如果目录扫描或文件读取失败
+     */
     @Scheduled(cron = "${app.sync.cron:0 0 3 * * *}")
     public void nightlySync() throws IOException {
         SyncResult result = syncService.sync("docs");

@@ -14,45 +14,46 @@ import java.nio.file.*;
 import java.util.*;
 import java.util.stream.Stream;
 
+/**
+ * 文档加载器。
+ * <p>
+ * 根据文件扩展名自动选择合适的 Spring AI Reader 加载文档内容。
+ * 支持 PDF、Office（Word/PPT/Excel）、Markdown、TXT、HTML 等常见格式。
+ * </p>
+ *
+ * <h3>支持的格式</h3>
+ * <ul>
+ *   <li><b>PDF</b> → {@link ParagraphPdfDocumentReader}（按段落解析）</li>
+ *   <li><b>Office</b>（docx/doc/ppt/pptx/xls/xlsx）→ {@link TikaDocumentReader}（Apache Tika 通用解析）</li>
+ *   <li><b>HTML</b> → {@link TikaDocumentReader}</li>
+ *   <li><b>Markdown</b> → {@link TextReader} + {@link MarkdownCleaner} 清洗</li>
+ *   <li><b>TXT</b> → {@link TextReader}</li>
+ * </ul>
+ */
 @Component
 @RequiredArgsConstructor
 public class DocumentLoader {
 
     private final MarkdownCleaner markdownCleaner;
 
+    /** 支持的文件扩展名（不含点） */
     private static final Set<String> SUPPORTED_EXTENSIONS =
             Set.of("pdf", "docx", "doc", "md", "txt", "ppt", "pptx", "xls", "xlsx", "html");
 
+    /** 扫描时需要排除的目录名 */
     private static final Set<String> EXCLUDE_DIRS =
             Set.of("archive", ".git", "node_modules");
 
-//    /**
-//     * 扫描目录，按文件类型分发到对应的 Reader
-//     */
-//    public List<Document> loadFromDirectory(String dirPath) throws IOException {
-//        List<Document> allDocuments = new ArrayList<>();
-//
-//        try (Stream<Path> paths = Files.walk(Paths.get(dirPath))) {
-//            paths.filter(Files::isRegularFile)
-//                 .filter(this::isSupported)
-//                 .filter(this::notExcluded)
-//                 .forEach(file -> {
-//                     try {
-//                         List<Document> docs = loadFile(file.toFile().getAbsolutePath());
-//                         allDocuments.addAll(docs);
-//                         System.out.printf("✓ 已加载: %s (%d 段)%n",
-//                                 file.getFileName(), docs.size());
-//                     } catch (Exception e) {
-//                         System.err.printf("✗ 加载失败: %s — %s%n",
-//                                 file.getFileName(), e.getMessage());
-//                     }
-//                 });
-//        }
-//        return allDocuments;
-//    }
-
     /**
-     * 加载单个文件
+     * 加载单个文件。
+     * <p>
+     * 策略模式：根据扩展名（switch expression）分发到不同的 Spring AI Reader。
+     * Markdown 文件额外经过 {@link MarkdownCleaner} 清洗。
+     * </p>
+     *
+     * @param filePath 文件绝对路径
+     * @return 文档段落列表
+     * @throws IllegalArgumentException 如果文件格式不支持
      */
     public List<Document> loadFile(String filePath) {
         String ext = getExtension(filePath).toLowerCase();
@@ -77,8 +78,15 @@ public class DocumentLoader {
     }
 
     /**
-     * 按文件路径分组加载（生产推荐）
-     * 返回 Map<文件绝对路径, 该文件的 Document 列表>，用于后续按文件注入正确的 source 元数据
+     * 按文件路径分组加载（生产推荐方式）。
+     * <p>
+     * 递归扫描目录，按文件逐个加载，返回 {@code Map<文件绝对路径, Document列表>}。
+     * 这种分组方式确保后续的 {@link MetadataEnricher#enrich} 能按文件注入正确的 source 路径。
+     * </p>
+     *
+     * @param dirPath 文档根目录
+     * @return 文件路径 → 该文件的 Document 列表（LinkedHashMap 保持扫描顺序）
+     * @throws IOException 如果遍历目录失败
      */
     public Map<String, List<Document>> loadGroupedByFile(String dirPath) throws IOException {
         Map<String, List<Document>> result = new LinkedHashMap<>();
@@ -103,10 +111,19 @@ public class DocumentLoader {
         return result;
     }
 
+    /**
+     * 判断文件扩展名是否在支持列表中。
+     */
     private boolean isSupported(Path path) {
         return SUPPORTED_EXTENSIONS.contains(getExtension(path.toString()));
     }
 
+    /**
+     * 判断路径是否不在排除目录中。
+     * <p>
+     * 检查路径的每一级目录名，只要有一级匹配排除列表就视为排除。
+     * </p>
+     */
     private boolean notExcluded(Path path) {
         for (int i = 0; i < path.getNameCount(); i++) {
             if (EXCLUDE_DIRS.contains(path.getName(i).toString())) {
@@ -116,6 +133,12 @@ public class DocumentLoader {
         return true;
     }
 
+    /**
+     * 获取文件扩展名（不含点）。
+     *
+     * @param filename 文件名或路径
+     * @return 小写扩展名，无扩展名时返回空字符串
+     */
     private String getExtension(String filename) {
         int dot = filename.lastIndexOf('.');
         return dot == -1 ? "" : filename.substring(dot + 1);
