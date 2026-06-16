@@ -55,6 +55,10 @@ app:
     admin:
       username: ${APP_ADMIN_USERNAME:admin}
       password: ${APP_ADMIN_PASSWORD:admin}
+  # 增量同步定时任务（按需开启）
+  sync:
+    enabled: false          # true 启用定时同步
+    cron: "0 0 3 * * *"     # 每天凌晨 3 点
   # Agent 能力开关（设为 true 启用 Tool Calling）
   agent:
     enabled: true
