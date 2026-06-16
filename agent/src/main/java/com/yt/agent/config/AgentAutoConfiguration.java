@@ -18,6 +18,9 @@ import java.util.Base64;
 @EnableConfigurationProperties(AgentProperties.class)
 public class AgentAutoConfiguration {
 
+    @Value("${app.knowledge.base-url:http://localhost:${server.port}}")
+    private String knowledgeBaseUrl;
+
     @Value("${app.knowledge.api-key:}")
     private String knowledgeApiKey;
 
@@ -26,7 +29,7 @@ public class AgentAutoConfiguration {
      */
     @Bean
     public RestClient knowledgeRestClient(RestClient.Builder builder) {
-        var b = builder.baseUrl("http://localhost:8090");
+        var b = builder.baseUrl(knowledgeBaseUrl);
         if (knowledgeApiKey != null && !knowledgeApiKey.isBlank()) {
             b.defaultHeader("X-API-Key", knowledgeApiKey);
         } else {

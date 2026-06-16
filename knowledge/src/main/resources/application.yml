@@ -1,5 +1,8 @@
 server:
   port: 8090
+  servlet:
+    context-path: /api
+
 
 spring:
   application:
@@ -55,6 +58,10 @@ app:
   # Agent 能力开关（设为 true 启用 Tool Calling）
   agent:
     enabled: true
+  # Agent 调用知识库的地址（默认用当前 server.port，无需修改）
+  # knowledge:
+  #   base-url: http://localhost:8090
+  #   api-key: ${APP_API_KEY:}
   # 导入配置
   import:
     batch-size: 200            # 每批写入 Qdrant 的 chunk 数
