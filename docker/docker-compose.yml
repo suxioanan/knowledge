@@ -36,8 +36,8 @@ services:
       # API Key 认证（生产必须，从 .env 读取）
       - QDRANT__SERVICE__API_KEY=${QDRANT_API_KEY}
 
-      # 启用静态文件（Dashboard，可选）
-      - QDRANT__SERVICE__ENABLE_STATIC_CONTENT=False
+      # 启用 Dashboard Web UI（访问 http://服务器IP:6333/dashboard）
+      - QDRANT__SERVICE__ENABLE_STATIC_CONTENT=True
 
     # ---- 资源限制 ----
     deploy:

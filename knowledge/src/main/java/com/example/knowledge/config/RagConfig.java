@@ -1,10 +1,13 @@
 package com.example.knowledge.config;
 
+import io.qdrant.client.QdrantClient;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
 import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.vectorstore.qdrant.QdrantVectorStore;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -59,9 +62,27 @@ public class RagConfig {
 
     @Bean
     public ChatClient chatClient(ChatClient.Builder builder,
-                                  QuestionAnswerAdvisor qaAdvisor) {
+                                  QuestionAnswerAdvisor qaAdvisor,
+                                  MessageChatMemoryAdvisor memoryAdvisor) {
         return builder
-            .defaultAdvisors(qaAdvisor)
+            .defaultAdvisors(qaAdvisor, memoryAdvisor)
+            .build();
+    }
+
+    /**
+     * QdrantVectorStore 自定义 Bean。
+     * HNSW 检索 ef 参数在 Qdrant 服务端配置（创建 collection 时设置 hnsw_config.ef_construct），客户端无需重复设置。
+     */
+    @Bean
+    public QdrantVectorStore qdrantVectorStore(QdrantClient qdrantClient,
+                                                org.springframework.ai.embedding.EmbeddingModel embeddingModel,
+                                                @Value("${spring.ai.vectorstore.qdrant.collection-name:knowledge}")
+                                                String collectionName,
+                                                @Value("${spring.ai.vectorstore.qdrant.initialize-schema:true}")
+                                                boolean initializeSchema) {
+        return QdrantVectorStore.builder(qdrantClient, embeddingModel)
+            .collectionName(collectionName)
+            .initializeSchema(initializeSchema)
             .build();
     }
 }

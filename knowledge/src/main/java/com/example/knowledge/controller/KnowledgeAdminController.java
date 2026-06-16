@@ -8,6 +8,17 @@ import org.springframework.ai.vectorstore.filter.Filter;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import com.example.knowledge.service.IncrementalSyncService;
+import com.example.knowledge.service.SyncResult;
+import lombok.RequiredArgsConstructor;
+import org.springframework.ai.document.Document;
+import org.springframework.ai.vectorstore.SearchRequest;
+import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.vectorstore.filter.Filter;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
@@ -17,6 +28,7 @@ import java.util.Map;
 public class KnowledgeAdminController {
 
     private final VectorStore vectorStore;
+    private final IncrementalSyncService syncService;
 
     @GetMapping("/check")
     @PreAuthorize("hasRole('ADMIN')")
@@ -49,5 +61,15 @@ public class KnowledgeAdminController {
             "collection", "knowledge",
             "tip", "精确统计请直接调用 Qdrant API: GET /collections/knowledge"
         );
+    }
+
+    /**
+     * 手动触发增量同步
+     * POST /api/knowledge/admin/sync?dir=docs
+     */
+    @PostMapping("/sync")
+    @PreAuthorize("hasRole('ADMIN')")
+    public SyncResult manualSync(@RequestParam(defaultValue = "docs") String dir) throws IOException {
+        return syncService.sync(dir);
     }
 }
