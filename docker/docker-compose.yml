@@ -1,0 +1,62 @@
+# ============================================================
+# Qdrant 向量数据库 — 服务器独立部署
+# ============================================================
+# 使用方式：
+#   1. 将此文件夹上传到服务器
+#   2. 修改 .env 中的 QDRANT_API_KEY
+#   3. docker compose up -d
+#   4. 验证：curl -H "api-key: your-key" http://localhost:6333
+# ============================================================
+
+version: '3.8'
+
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    restart: unless-stopped
+
+    ports:
+      - "6333:6333"   # HTTP API（仅本地访问，Spring Boot 通过内网连）
+      - "6334:6334"   # gRPC API
+
+    # ---- 数据持久化：映射到宿主机目录 ----
+    volumes:
+      - ./data/storage:/qdrant/storage      # 向量数据 + collection 元数据
+      - ./data/snapshots:/qdrant/snapshots  # 快照备份目录
+      - ./data/config:/qdrant/config        # 自定义配置文件
+
+    environment:
+      # 日志级别
+      - QDRANT__LOG_LEVEL=INFO
+
+      # gRPC 端口（Spring AI 默认走 gRPC:6334）
+      - QDRANT__SERVICE__GRPC_PORT=6334
+
+      # API Key 认证（生产必须，从 .env 读取）
+      - QDRANT__SERVICE__API_KEY=${QDRANT_API_KEY}
+
+      # 启用静态文件（Dashboard，可选）
+      - QDRANT__SERVICE__ENABLE_STATIC_CONTENT=False
+
+    # ---- 资源限制 ----
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+          cpus: '2'
+
+    # ---- 健康检查 ----
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+    # ---- 日志轮转 ----
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"

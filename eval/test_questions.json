@@ -1,0 +1,17 @@
+[
+  {
+    "question": "订单创建接口有哪些必填参数？",
+    "expected_sources": ["test.md"],
+    "expected_keywords": ["用户ID", "商品列表", "收货地址"]
+  },
+  {
+    "question": "订单创建接口的可选参数有哪些？",
+    "expected_sources": ["test.md"],
+    "expected_keywords": ["优惠券码", "备注"]
+  },
+  {
+    "question": "订单创建接口的返回值包含什么？",
+    "expected_sources": ["test.md"],
+    "expected_keywords": ["订单ID", "状态", "预计送达时间"]
+  }
+]

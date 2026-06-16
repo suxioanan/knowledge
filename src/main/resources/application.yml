@@ -1,0 +1,71 @@
+server:
+  port: 8090
+
+spring:
+  application:
+    name: knowledge-base
+
+  # AI 配置
+  ai:
+    ollama:
+      base-url: http://localhost:11434
+      chat:
+        model: qwen:14b
+        options:
+          temperature: 0.3          # 知识库场景建议偏低，减少幻觉
+          num-predict: 2048         # 最大输出 token 数
+      embedding:                   # 文本向量化
+        model: bge-m3              # 把文本转成向量的模型
+        # BGE-M3 输出维度固定为 1024，无需也无法配置
+
+    vectorstore:
+      qdrant:
+        host: 172.16.41.107
+        port: 6334                  # gRPC 端口（推荐）
+        api-key: 1234567890987654321
+        collection-name: knowledge
+        initialize-schema: true     # 首次启动自动创建 collection
+
+  # Actuator 监控端点
+  management:
+    endpoints:
+      web:
+        exposure:
+          include: health,metrics,prometheus
+    metrics:
+      export:
+        prometheus:
+          enabled: true
+      tags:
+        application: knowledge-base
+    endpoint:
+      health:
+        show-details: when-authorized
+
+# ========== 应用自定义配置 ==========
+app:
+  # 安全配置
+  security:
+    # API Key 模式（设置后即可用 X-API-Key header 认证）
+    api-key: ${APP_API_KEY:}
+    # 管理员账号（Basic Auth）
+    admin:
+      username: ${APP_ADMIN_USERNAME:admin}
+      password: ${APP_ADMIN_PASSWORD:admin}
+  # 导入配置
+  import:
+    batch-size: 200            # 每批写入 Qdrant 的 chunk 数
+    parallel-threads: 3        # 并行 Embedding 线程数（不宜超过 Ollama 并发上限）
+    docs-dir: docs             # 默认文档目录
+  # 检索配置
+  retrieval:
+    top-k: 5
+    similarity-threshold: 0.7
+    # 上下文扩展：检索时附加上下文 chunk 数量（前后各 N 个）
+    neighbor-chunks: 1
+
+# 日志配置
+logging:
+  level:
+    org.springframework.ai: INFO
+    com.example.knowledge: DEBUG
