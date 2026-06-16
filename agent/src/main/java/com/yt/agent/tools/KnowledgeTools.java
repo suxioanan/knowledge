@@ -19,7 +19,7 @@ import java.util.Map;
  */
 @Slf4j
 @RequiredArgsConstructor
-public class KnowledgeTools {
+public class KnowledgeTools implements AgentTool {
 
     private final RestClient knowledgeRestClient;
 
