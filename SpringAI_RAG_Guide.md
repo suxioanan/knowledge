@@ -1187,7 +1187,6 @@ public class MetadataEnricher {
 ```java
 package com.example.knowledge.service;
 
-import com.example.knowledge.etl.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
@@ -1205,9 +1204,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class KnowledgeImportService {
 
     private final DocumentLoader documentLoader;
+
     private final DocumentCleaner documentCleaner;
+
     private final ChunkSplitter chunkSplitter;
+
     private final MetadataEnricher metadataEnricher;
+
     private final VectorStore vectorStore;
 
     @Value("${app.import.batch-size:200}")
@@ -1360,7 +1363,6 @@ public class ImportResult {
 ```java
 package com.example.knowledge.controller;
 
-import com.example.knowledge.service.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;

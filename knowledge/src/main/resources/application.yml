@@ -10,7 +10,7 @@ spring:
     ollama:
       base-url: http://localhost:11434
       chat:
-        model: qwen:14b
+        model: qwen3:14b
         options:
           temperature: 0.3          # 知识库场景建议偏低，减少幻觉
           num-predict: 2048         # 最大输出 token 数
@@ -52,6 +52,9 @@ app:
     admin:
       username: ${APP_ADMIN_USERNAME:admin}
       password: ${APP_ADMIN_PASSWORD:admin}
+  # Agent 能力开关（设为 true 启用 Tool Calling）
+  agent:
+    enabled: true
   # 导入配置
   import:
     batch-size: 200            # 每批写入 Qdrant 的 chunk 数

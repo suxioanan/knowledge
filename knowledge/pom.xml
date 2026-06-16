@@ -11,7 +11,7 @@
         <relativePath/>
     </parent>
 
-    <groupId>com.example</groupId>
+    <groupId>com.yt</groupId>
     <artifactId>knowledge</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>knowledge</name>
@@ -100,6 +100,13 @@
         <dependency>
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+
+        <!-- ========== Agent 模块（可选插件） ========== -->
+        <dependency>
+            <groupId>com.yt</groupId>
+            <artifactId>agent</artifactId>
+            <version>0.0.1-SNAPSHOT</version>
         </dependency>
 
         <!-- ========== 工具 ========== -->
