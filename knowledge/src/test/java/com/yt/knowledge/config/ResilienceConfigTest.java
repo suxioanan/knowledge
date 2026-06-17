@@ -1,132 +1,132 @@
 package com.yt.knowledge.config;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpRequest;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientException;
+import org.springframework.http.client.ClientHttpRequestExecution;
+import org.springframework.http.client.ClientHttpResponse;
+import org.springframework.mock.http.client.MockClientHttpResponse;
 
-import java.util.concurrent.atomic.AtomicInteger;
+import java.io.IOException;
 
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.*;
 
 /**
  * {@link ResilienceConfig} 单元测试。
  * <p>
- * 验证 Ollama 请求的指数退避重试逻辑。
+ * 直接测试 RetryInterceptor 的指数退避重试逻辑：
+ * 第 1 次失败 → 退避 2s → 第 2 次失败 → 退避 4s → 第 3 次成功/失败。
  * </p>
  */
 @DisplayName("ResilienceConfig 单元测试")
 class ResilienceConfigTest {
 
-    private ResilienceConfig config;
-
-    @BeforeEach
-    void setUp() {
-        config = new ResilienceConfig();
-    }
-
     @Nested
-    @DisplayName("重试次数和退避")
-    class RetryAndBackoff {
-
-        private RestClient.Builder builder;
-        private AtomicInteger attemptCount;
-
-        @BeforeEach
-        void setUp() {
-            builder = config.ollamaRestClientBuilder();
-            attemptCount = new AtomicInteger(0);
-        }
+    @DisplayName("ollamaRestClientBuilder")
+    class BuilderTest {
 
         @Test
-        @DisplayName("第一次尝试成功 → 不重试")
-        void shouldNotRetryOnSuccess() throws Exception {
-            RestClient client = builder
-                .requestInterceptor((req, body, exec) -> {
-                    attemptCount.incrementAndGet();
-                    // 模拟成功响应
-                    return mockResponse();
-                })
-                .build();
-
-            // 验证 builder 已配置重试拦截器
-            assertNotNull(builder);
-            // 使用 SimpleClientHttpRequestFactory 需要实际请求，此处仅验证配置
-            // 通过检查 builder 创建了拦截器链即可
-        }
-
-        @Test
-        @DisplayName("builder 创建成功 → 不为 null")
+        @DisplayName("builder 创建成功且包含 RetryInterceptor")
         void shouldCreateBuilder() {
-            assertNotNull(builder);
+            ResilienceConfig config = new ResilienceConfig();
+            assertNotNull(config.ollamaRestClientBuilder());
         }
     }
 
     @Nested
-    @DisplayName("线程中断处理")
-    class InterruptHandling {
+    @DisplayName("RetryInterceptor 重试逻辑")
+    class RetryInterceptorTest {
 
         @Test
-        @DisplayName("InterruptedException → 恢复中断标志后抛出异常")
-        void shouldRestoreInterruptFlag() {
-            // 验证 ResilienceConfig 正确处理 InterruptedException
-            // 通过一个受控的中断测试
+        @DisplayName("首次请求成功 → 不重试，直接返回响应")
+        void shouldNotRetryOnSuccess() throws IOException {
+            ResilienceConfig.RetryInterceptor interceptor = new ResilienceConfig.RetryInterceptor();
+            HttpRequest request = mock(HttpRequest.class);
+            ClientHttpRequestExecution execution = mock(ClientHttpRequestExecution.class);
+            ClientHttpResponse successResponse = new MockClientHttpResponse(new byte[0], HttpStatus.OK);
+            when(execution.execute(any(), any())).thenReturn(successResponse);
+
+            ClientHttpResponse result = interceptor.intercept(request, new byte[0], execution);
+
+            assertEquals(HttpStatus.OK, result.getStatusCode());
+            verify(execution, times(1)).execute(any(), any());
+        }
+
+        @Test
+        @DisplayName("前 2 次失败、第 3 次成功 → 重试 3 次后成功")
+        void shouldRetryAndSucceed() throws IOException {
+            ResilienceConfig.RetryInterceptor interceptor = new ResilienceConfig.RetryInterceptor();
+            HttpRequest request = mock(HttpRequest.class);
+            ClientHttpRequestExecution execution = mock(ClientHttpRequestExecution.class);
+            ClientHttpResponse successResponse = new MockClientHttpResponse(new byte[0], HttpStatus.OK);
+
+            // 前 2 次抛异常，第 3 次成功
+            when(execution.execute(any(), any()))
+                .thenThrow(new IOException("网络错误1"))
+                .thenThrow(new IOException("网络错误2"))
+                .thenReturn(successResponse);
+
+            // 注入 spy 以便验证 sleep（这里 we can't easily test sleep，
+            // 但至少验证重试了 3 次）
+            ClientHttpResponse result = interceptor.intercept(request, new byte[0], execution);
+
+            assertEquals(HttpStatus.OK, result.getStatusCode());
+            // 验证 execute 被调用了 3 次
+            verify(execution, times(3)).execute(any(), any());
+        }
+
+        @Test
+        @DisplayName("3 次全部失败 → 抛出 IOException")
+        void shouldThrowAfterMaxRetries() throws IOException {
+            ResilienceConfig.RetryInterceptor interceptor = new ResilienceConfig.RetryInterceptor();
+            HttpRequest request = mock(HttpRequest.class);
+            ClientHttpRequestExecution execution = mock(ClientHttpRequestExecution.class);
+            when(execution.execute(any(), any()))
+                .thenThrow(new IOException("持续失败"));
+
+            IOException ex = assertThrows(IOException.class, () ->
+                interceptor.intercept(request, new byte[0], execution));
+
+            assertTrue(ex.getMessage().contains("已重试3次"));
+            verify(execution, times(3)).execute(any(), any());
+        }
+
+        @Test
+        @DisplayName("重试期间被中断 → InterruptedException → 抛出 IOException 并恢复中断标志")
+        void shouldHandleInterruptedException() throws IOException {
+            ResilienceConfig.RetryInterceptor interceptor = new ResilienceConfig.RetryInterceptor();
+            HttpRequest request = mock(HttpRequest.class);
+            ClientHttpRequestExecution execution = mock(ClientHttpRequestExecution.class);
+
+            // 第一次失败
+            when(execution.execute(any(), any()))
+                .thenThrow(new IOException("网络错误"));
+
+            // 在另一个线程中调用，并在 sleep 期间中断它
             Thread testThread = new Thread(() -> {
-                ResilienceConfig config = new ResilienceConfig();
-                RestClient.Builder builder = config.ollamaRestClientBuilder();
-
-                // 设置中断标志
-                Thread.currentThread().interrupt();
-
-                // 创建客户端并尝试发送请求
-                RestClient client = builder
-                    .requestInterceptor((req, body, exec) -> {
-                        // 检查中断状态并抛出
-                        if (Thread.currentThread().isInterrupted()) {
-                            throw new RestClientException("Interrupted");
-                        }
-                        return mockResponse();
-                    })
-                    .build();
+                // 首次调用失败后，RetryInterceptor 会 sleep 2000ms
+                // 我们在 sleep 期间中断线程
+                assertThrows(IOException.class, () -> {
+                    interceptor.intercept(request, new byte[0], execution);
+                });
+                // 验证中断标志已恢复
+                assertTrue(Thread.currentThread().isInterrupted());
             });
 
             testThread.start();
-            // 等待线程完成
+            // 等待一小段时间让 execute 被调用，然后中断
+            try { Thread.sleep(200); } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            testThread.interrupt();
             try { testThread.join(5000); } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
-            // 不应有异常传播
         }
-    }
-
-    /** 创建模拟响应对象 */
-    private static org.springframework.http.client.ClientHttpResponse mockResponse() {
-        return new org.springframework.http.client.ClientHttpResponse() {
-            @Override
-            public org.springframework.http.HttpStatusCode getStatusCode() {
-                return HttpStatus.OK;
-            }
-
-            @Override
-            public String getStatusText() {
-                return "OK";
-            }
-
-            @Override
-            public void close() {}
-
-            @Override
-            public java.io.InputStream getBody() {
-                return java.io.InputStream.nullInputStream();
-            }
-
-            @Override
-            public org.springframework.http.HttpHeaders getHeaders() {
-                return org.springframework.http.HttpHeaders.EMPTY;
-            }
-        };
     }
 }

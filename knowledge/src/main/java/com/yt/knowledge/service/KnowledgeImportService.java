@@ -31,6 +31,7 @@ public class KnowledgeImportService {
     private final ChunkSplitter chunkSplitter;
     private final MetadataEnricher metadataEnricher;
     private final VectorStore vectorStore;
+    private final KnowledgeMetrics knowledgeMetrics;
 
     @Value("${app.import.batch-size:200}")
     private int batchSize;
@@ -101,12 +102,24 @@ public class KnowledgeImportService {
                 }));
             }
 
-            for (Future<?> future : futures) {
-                future.get(30, TimeUnit.MINUTES);
+            try {
+                for (Future<?> future : futures) {
+                    future.get(30, TimeUnit.MINUTES);
+                }
+            } finally {
+                executor.shutdown();
+                try {
+                    if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+                        executor.shutdownNow();
+                    }
+                } catch (InterruptedException e) {
+                    executor.shutdownNow();
+                    Thread.currentThread().interrupt();
+                }
             }
-            executor.shutdown();
 
             result.setSuccess(true);
+            knowledgeMetrics.recordImport(allChunks.size());
         } catch (Exception e) {
             result.setSuccess(false);
             result.setError(e.getMessage());
@@ -197,6 +210,7 @@ public class KnowledgeImportService {
         long elapsed = System.currentTimeMillis() - start;
         result.setElapsedMs(elapsed);
         result.setSuccess(true);
+        knowledgeMetrics.recordImport(allChunks.size());
         log.info("批量路径导入完成: {} chunk / {} 批次，耗时 {}s",
                 allChunks.size(), batches.size(), String.format("%.1f", elapsed / 1000.0));
         return result;

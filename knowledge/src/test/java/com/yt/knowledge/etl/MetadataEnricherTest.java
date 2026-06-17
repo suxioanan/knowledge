@@ -30,6 +30,19 @@ class MetadataEnricherTest {
     }
 
     @Nested
+    @DisplayName("空列表输入")
+    class EmptyList {
+
+        @Test
+        @DisplayName("空列表 → 返回空列表，不抛异常")
+        void shouldHandleEmptyDocumentList() {
+            List<Document> result = enricher.enrich(List.of(), "/data/test.md");
+            assertNotNull(result);
+            assertTrue(result.isEmpty());
+        }
+    }
+
+    @Nested
     @DisplayName("source 和 file_name 元数据")
     class SourceAndFileName {
 

@@ -59,28 +59,43 @@ public class RAGEvaluator {
                     .query(tc.getQuestion())
                     .build());
 
+            List<String> expectedSources = tc.getExpectedSources() != null
+                ? tc.getExpectedSources() : List.of();
             boolean hit = retrieved.stream()
-                .anyMatch(doc -> tc.getExpectedSources().stream()
-                    .anyMatch(expected ->
-                        doc.getMetadata().getOrDefault("file_name", "").toString()
-                           .contains(expected)));
+                    .anyMatch(doc -> expectedSources.stream()
+                            .anyMatch(expected ->
+                                    doc.getMetadata().getOrDefault("file_name", "").toString()
+                                            .contains(expected)));
+
+            // 提取实际检索到的来源文档列表
+            List<String> actualSources = retrieved.stream()
+                    .map(doc -> doc.getMetadata().getOrDefault("file_name", "unknown").toString())
+                    .distinct()
+                    .collect(java.util.stream.Collectors.toList());
 
             // 2. 调用 QA 服务生成回答
             String answer = qaService.ask(tc.getQuestion());
 
             // 3. 计算关键词覆盖率
-            long matched = tc.getExpectedKeywords().stream()
-                .filter(answer::contains).count();
-            double rate = tc.getExpectedKeywords().isEmpty()
-                ? 0.0
-                : 1.0 * matched / tc.getExpectedKeywords().size();
+            List<String> expectedKeywords = tc.getExpectedKeywords() != null
+                ? tc.getExpectedKeywords() : List.of();
+            long matched = expectedKeywords.stream()
+                    .filter(answer::contains).count();
+            double rate = expectedKeywords.isEmpty()
+                    ? 0.0
+                    : 1.0 * matched / expectedKeywords.size();
 
             EvalItem item = new EvalItem();
             item.setQuestion(tc.getQuestion());
             item.setSourceHit(hit);
             item.setKeywordCoverage(rate);
+            item.setRetrievedSources(actualSources);
             item.setAnswer(answer);
             result.getItems().add(item);
+
+
+
+
         }
 
         // 汇总指标

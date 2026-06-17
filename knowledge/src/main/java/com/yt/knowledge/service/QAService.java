@@ -103,23 +103,28 @@ public class QAService {
 
         // 1. 检索 TopK
         List<Document> retrieved = vectorStore.similaritySearch(
-            SearchRequest.builder()
-                .topK(topK)
-                .similarityThreshold(similarityThreshold)
-                .query(cleaned)
-                .build());
+                SearchRequest.builder()
+                        .topK(topK)
+                        .similarityThreshold(similarityThreshold)
+                        .query(cleaned)
+                        .build());
 
         // 2. 扩展相邻 Chunk（前后各 neighborChunks 个）
         List<Document> expanded = contextExpander.expandWithNeighbors(
-            retrieved, vectorStore, neighborChunks);
+                retrieved, vectorStore, neighborChunks);
 
-        // 3. 拼接上下文，每个 Chunk 注明来源文件
+        // 3. 处理无结果的情况
+        if (expanded == null || expanded.isEmpty()) {
+            return "抱歉，知识库中未找到相关信息。建议补充相关文档。";
+        }
+
+        // 4. 拼接上下文，每个 Chunk 注明来源文件
         String context = expanded.stream()
-            .map(doc -> "【来源：" + doc.getMetadata().getOrDefault("file_name", "未知") + "】\n"
-                    + doc.getText())
-            .collect(Collectors.joining("\n\n---\n\n"));
+                .map(doc -> "【来源：" + doc.getMetadata().getOrDefault("file_name", "未知") + "】\n"
+                        + doc.getText())
+                .collect(Collectors.joining("\n\n---\n\n"));
 
-        // 4. 自组 Prompt 调用 LLM 生成回答
+        // 5. 自组 Prompt 调用 LLM 生成回答
         String prompt = """
             根据以下参考内容回答问题。如果参考内容不足以回答，请说明需要哪些额外信息。
 

@@ -1,6 +1,7 @@
 package com.yt.knowledge.etl;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.reader.TextReader;
 import org.springframework.ai.reader.pdf.ParagraphPdfDocumentReader;
@@ -30,6 +31,7 @@ import java.util.stream.Stream;
  *   <li><b>TXT</b> → {@link TextReader}</li>
  * </ul>
  */
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class DocumentLoader {
@@ -100,11 +102,9 @@ public class DocumentLoader {
                          String absPath = file.toAbsolutePath().toString();
                          List<Document> docs = loadFile(absPath);
                          result.put(absPath, docs);
-                         System.out.printf("✓ 已加载: %s (%d 段)%n",
-                                 file.getFileName(), docs.size());
+                         log.info("✓ 已加载: {} ({} 段)", file.getFileName(), docs.size());
                      } catch (Exception e) {
-                         System.err.printf("✗ 加载失败: %s — %s%n",
-                                 file.getFileName(), e.getMessage());
+                         log.warn("✗ 加载失败: {} — {}", file.getFileName(), e.getMessage());
                      }
                  });
         }

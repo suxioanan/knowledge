@@ -4,6 +4,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -23,6 +24,7 @@ import java.util.List;
  * - 如果没有配置 apiKey（空字符串）→ 过滤器不生效，走 Basic Auth
  * - API Key 不匹配 → 继续走下一个过滤器（Basic Auth）
  */
+@Slf4j
 public class ApiKeyFilter extends OncePerRequestFilter {
 
     private static final String API_KEY_HEADER = "X-API-Key";
@@ -49,6 +51,9 @@ public class ApiKeyFilter extends OncePerRequestFilter {
             var auth = new UsernamePasswordAuthenticationToken(
                 "api-key-user", null, authorities);
             SecurityContextHolder.getContext().setAuthentication(auth);
+            log.debug("API Key 认证成功: IP={}, URI={}", request.getRemoteAddr(), request.getRequestURI());
+        } else if (StringUtils.hasText(requestApiKey)) {
+            log.warn("API Key 认证失败: IP={}, URI={}", request.getRemoteAddr(), request.getRequestURI());
         }
 
         chain.doFilter(request, response);

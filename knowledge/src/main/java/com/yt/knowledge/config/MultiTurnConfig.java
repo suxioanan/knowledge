@@ -25,8 +25,9 @@ public class MultiTurnConfig {
 
     @Bean
     public MessageChatMemoryAdvisor chatMemoryAdvisor(ChatMemory chatMemory) {
+        // 不设置默认 conversationId，由调用方动态传入
+        // 避免不同会话之间的历史消息污染
         return MessageChatMemoryAdvisor.builder(chatMemory)
-            .conversationId("conversation")
             .build();
     }
 }

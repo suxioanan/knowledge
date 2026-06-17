@@ -51,6 +51,19 @@ class MarkdownCleanerTest {
             assertTrue(result.contains("# 标题"));
             assertTrue(result.contains("正文内容"));
         }
+
+        @Test
+        @DisplayName("frontmatter 结尾无换行 → 仍被移除")
+        void shouldRemoveFrontmatterWithoutTrailingNewline() {
+            // 结尾 `---` 后没有 `\n`，这是边界情况
+            String input = "---\ntitle: test\n---";
+            String result = cleaner.clean(input);
+            // 当前正则 `^---\\n.*?\\n---\\n` 要求结尾有 `\n`，
+            // 无尾部换行时前端页可能保留。记录当前行为作为回归基准。
+            // 如果未来修复此边界情况，请同步更新此测试的期望。
+            assertFalse(result.contains("title:"),
+                "frontmatter 元数据应被移除（注：若此断言失败，说明正则已修复可处理无尾部换行的情况，请更新此期望）");
+        }
     }
 
     @Nested

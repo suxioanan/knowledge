@@ -17,7 +17,7 @@ import java.util.List;
  *   <li>合并多余空白字符（多空格、换行 → 单空格）</li>
  * </ol>
  * <p>
- * 清洗后过滤掉空白文档和长度不足 30 字符的碎片。
+ * 清洗后过滤掉空白文档和长度不足 15 字符的碎片。
  * </p>
  */
 @Component
@@ -33,7 +33,7 @@ public class DocumentCleaner {
         return documents.stream()
             .map(this::cleanDocument)
             .filter(doc -> !doc.getText().isBlank())
-            .filter(doc -> doc.getText().length() >= 30)
+            .filter(doc -> doc.getText().length() >= 15)
             .toList();
     }
 
@@ -61,7 +61,7 @@ public class DocumentCleaner {
         // 移除残留的 "All rights reserved."
         text = text.replaceAll("(?i)all rights reserved\\.?", "");
         // 移除独立的纯数字行（页号残留）
-        text = text.replaceAll("^\\d{1,3}\\s*$", "");
+        text = text.replaceAll("(?m)^\\d{1,3}\\s*$", "");
         // 合并多余空白
         text = text.replaceAll("\\s+", " ").trim();
 

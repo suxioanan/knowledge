@@ -3,11 +3,10 @@ package com.yt.knowledge.service;
 import com.yt.knowledge.model.SyncResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-
-import java.io.IOException;
 
 /**
  * 定时增量同步调度器。
@@ -35,14 +34,20 @@ public class SyncScheduler {
      * 扫描 docs 目录，对比 MD5 哈希检测文件变更（新增/修改/删除），
      * 自动同步到 Qdrant 向量库。
      * </p>
-     *
-     * @throws IOException 如果目录扫描或文件读取失败
      */
+    @Value("${app.import.docs-dir:docs}")
+    private String docsDir;
+
     @Scheduled(cron = "${app.sync.cron:0 0 3 * * *}")
-    public void nightlySync() throws IOException {
-        SyncResult result = syncService.sync("docs");
-        log.info("增量同步完成: 新增{} 更新{} 删除{} 跳过{}",
-                result.getAdded(), result.getUpdated(),
-                result.getDeleted(), result.getSkipped());
+    public void nightlySync() {
+        try {
+            SyncResult result = syncService.sync(docsDir);
+            log.info("增量同步完成: 新增{} 更新{} 删除{} 跳过{}",
+                    result.getAdded(), result.getUpdated(),
+                    result.getDeleted(), result.getSkipped());
+        } catch (Exception e) {
+            log.error("增量同步失败: {}", e.getMessage(), e);
+            // 不抛出异常，保证下次调度正常执行
+        }
     }
 }

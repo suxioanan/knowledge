@@ -15,19 +15,18 @@ spring:
       chat:
         model: qwen3:14b
         options:
-          temperature: 0.3          # 知识库场景建议偏低，减少幻觉
-          num-predict: 2048         # 最大输出 token 数
-      embedding:                   # 文本向量化
-        model: bge-m3              # 把文本转成向量的模型
-        # BGE-M3 输出维度固定为 1024，无需也无法配置
+          temperature: 0.3
+          num-predict: 2048
+      embedding:
+        model: bge-m3
 
     vectorstore:
       qdrant:
         host: 172.16.41.107
-        port: 6334                  # gRPC 端口（推荐）
-        api-key: 1234567890987654321
+        port: 6334
+        api-key: ${QDRANT_API_KEY:1234567890987654321}
         collection-name: knowledge
-        initialize-schema: true     # 首次启动自动创建 collection
+        initialize-schema: true
 
   # Actuator 监控端点
   management:
@@ -49,37 +48,37 @@ spring:
 app:
   # 安全配置
   security:
-    # API Key 模式（设置后即可用 X-API-Key header 认证）
     api-key: ${APP_API_KEY:}
-    # 管理员账号（Basic Auth）
     admin:
       username: ${APP_ADMIN_USERNAME:admin}
       password: ${APP_ADMIN_PASSWORD:admin}
-  # 增量同步定时任务（按需开启）
+  # 限流配置
+  rate-limit:
+    enabled: true
+    requests-per-minute: 60
+    admin-requests-per-minute: 300
+    ip-whitelist: 127.0.0.1,::1
+  # 增量同步定时任务
   sync:
-    enabled: false          # true 启用定时同步
-    cron: "0 0 3 * * *"     # 每天凌晨 3 点
-  # Agent 能力开关（设为 true 启用 Tool Calling）
+    index-path: ${APP_SYNC_INDEX_PATH:sync-index.properties}
+    enabled: false
+    cron: "0 0 3 * * *"
+  # Agent 能力开关
   agent:
     enabled: true
-  # Agent 调用知识库的地址（默认用当前 server.port，无需修改）
-  # knowledge:
-  #   base-url: http://localhost:8090
-  #   api-key: ${APP_API_KEY:}
   # 导入配置
   import:
-    batch-size: 200            # 每批写入 Qdrant 的 chunk 数
-    parallel-threads: 3        # 并行 Embedding 线程数（不宜超过 Ollama 并发上限）
-    docs-dir: docs             # 默认文档目录
+    batch-size: 200
+    parallel-threads: 3
+    docs-dir: docs
   # 检索配置
   retrieval:
     top-k: 5
     similarity-threshold: 0.7
-    # 上下文扩展：检索时附加上下文 chunk 数量（前后各 N 个）
     neighbor-chunks: 1
 
 # 日志配置
 logging:
   level:
     org.springframework.ai: INFO
-    com.example.knowledge: DEBUG
+    com.yt.knowledge: DEBUG

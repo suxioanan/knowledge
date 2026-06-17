@@ -13,11 +13,11 @@ public class ImportResult {
     /** 导入是否成功 */
     private boolean success;
     /** 处理的文件数 */
-    private int fileCount;
+    private long fileCount;
     /** 清洗后保留的文档数 */
-    private int afterClean;
+    private long afterClean;
     /** 最终的 Chunk 总数 */
-    private int chunkCount;
+    private long chunkCount;
     /** 导入耗时（毫秒） */
     private long elapsedMs;
     /** 错误信息（仅在 success=false 时有值） */

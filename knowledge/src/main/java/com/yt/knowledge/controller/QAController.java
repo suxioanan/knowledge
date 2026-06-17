@@ -5,9 +5,11 @@ import com.yt.knowledge.service.QAService;
 import com.yt.knowledge.service.RAGEvaluator;
 import com.yt.knowledge.service.RAGEvaluator.EvalResult;
 import com.yt.knowledge.service.RAGEvaluator.EvalCase;
+import com.yt.knowledge.service.HybridSearchService;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.document.Document;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.MediaType;
@@ -17,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/knowledge")
@@ -25,19 +28,25 @@ public class QAController {
     private final QAService qaService;
     private final MultiTurnQAService multiTurnQAService;
     private final RAGEvaluator evaluator;
+    private final HybridSearchService hybridSearchService;
     private final ObjectProvider<ChatClient> agentChatClientProvider;
     private final ObjectProvider<ChatClient> unifiedChatClientProvider;
+    private final ChatClient.Builder chatClientBuilder;
 
     public QAController(QAService qaService,
                          MultiTurnQAService multiTurnQAService,
                          RAGEvaluator evaluator,
+                         HybridSearchService hybridSearchService,
                          @Qualifier("agentChatClient") ObjectProvider<ChatClient> agentChatClientProvider,
-                         @Qualifier("unifiedChatClient") ObjectProvider<ChatClient> unifiedChatClientProvider) {
+                         @Qualifier("unifiedChatClient") ObjectProvider<ChatClient> unifiedChatClientProvider,
+                         ChatClient.Builder chatClientBuilder) {
         this.qaService = qaService;
         this.multiTurnQAService = multiTurnQAService;
         this.evaluator = evaluator;
+        this.hybridSearchService = hybridSearchService;
         this.agentChatClientProvider = agentChatClientProvider;
         this.unifiedChatClientProvider = unifiedChatClientProvider;
+        this.chatClientBuilder = chatClientBuilder;
     }
 
     // ==================== 单轮问答 ====================
@@ -73,6 +82,44 @@ public class QAController {
     @PostMapping("/ask/enhanced")
     public ResponseEntity<AnswerResponse> askEnhanced(@RequestBody QuestionRequest request) {
         String answer = qaService.askWithNeighborContext(request.getQuestion());
+        return ResponseEntity.ok(new AnswerResponse(answer));
+    }
+
+    /**
+     * 混合检索问答（向量 + 关键词）
+     */
+    @PostMapping("/ask/hybrid")
+    public ResponseEntity<AnswerResponse> askHybrid(@RequestBody QuestionRequest request) {
+        List<Document> docs = hybridSearchService.hybridSearch(request.getQuestion(), 5);
+
+        // 处理无结果的情况
+        if (docs == null || docs.isEmpty()) {
+            return ResponseEntity.ok(new AnswerResponse(
+                    "抱歉，知识库中未找到与您的问题相关的信息。请尝试其他关键词或联系管理员补充相关文档。"));
+        }
+
+        // 用混合检索结果生成回答
+        String context = docs.stream()
+                .map(doc -> "【来源：" + doc.getMetadata().getOrDefault("file_name", "未知") + "】\n"
+                        + doc.getText())
+                .collect(Collectors.joining("\n\n---\n\n"));
+
+
+        String prompt = """
+            根据以下参考内容回答问题。
+            
+            ## 参考内容
+            %s
+            
+            ## 用户问题
+            %s
+            
+            ## 回答
+            """.formatted(context, request.getQuestion());
+
+        // 用裸 ChatClient（无 Advisor）直接生成，避免二次检索
+        ChatClient plainClient = chatClientBuilder.build();
+        String answer = plainClient.prompt().user(prompt).call().content();
         return ResponseEntity.ok(new AnswerResponse(answer));
     }
 

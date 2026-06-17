@@ -37,7 +37,8 @@ public class DocumentSearchTool implements AgentTool {
 
         List<Document> results = vectorStore.similaritySearch(
             SearchRequest.builder()
-                .topK(Math.max(1, Math.min(topK, 10)))  // 限制 1-10
+                .query(keyword)
+                .topK(Math.max(1, Math.min(topK, 10)))
                 .similarityThreshold(0.5)
                 .build());
 

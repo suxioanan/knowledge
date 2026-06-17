@@ -35,7 +35,7 @@ public class KnowledgeMetrics {
      */
     public void recordImport(int chunkCount) {
         if (totalChunks != null) {
-            totalChunks.set(chunkCount);
+            totalChunks.addAndGet(chunkCount);
         }
         registry.counter("knowledge.import.count").increment();
     }

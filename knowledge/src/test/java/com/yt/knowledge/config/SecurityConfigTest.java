@@ -6,16 +6,23 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.Answers;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.security.config.annotation.ObjectPostProcessor;
+import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.security.web.SecurityFilterChain;
 
 import java.io.IOException;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.*;
 
 /**
  * 安全配置相关单元测试。
@@ -69,10 +76,8 @@ class SecurityConfigTest {
 
             filter.doFilterInternal(request, response, chain);
 
-            // 不设认证，状态码正常
             assertNull(SecurityContextHolder.getContext().getAuthentication());
             assertEquals(200, response.getStatus());
-            // 过滤链继续（交给 Basic Auth）
             verify(chain).doFilter(request, response);
         }
 
@@ -145,8 +150,56 @@ class SecurityConfigTest {
             var userDetailsService = config.userDetailsService();
 
             assertThrows(
-                org.springframework.security.core.userdetails.UsernameNotFoundException.class,
+                UsernameNotFoundException.class,
                 () -> userDetailsService.loadUserByUsername("unknown"));
+        }
+
+        @Test
+        @DisplayName("adminPassword 未配置 → IllegalStateException")
+        void shouldThrowWhenAdminPasswordNotConfigured() {
+            SecurityConfig config = new SecurityConfig();
+            ReflectionTestUtils.setField(config, "adminPassword", "");
+            assertThrows(IllegalStateException.class, config::userDetailsService);
+        }
+
+        /** 用默认值创建 SecurityConfig 实例 */
+        private SecurityConfig createConfigWithDefaults() {
+            SecurityConfig config = new SecurityConfig();
+            ReflectionTestUtils.setField(config, "apiKey", "test-key");
+            ReflectionTestUtils.setField(config, "adminUsername", "admin");
+            ReflectionTestUtils.setField(config, "adminPassword", "admin123");
+            ReflectionTestUtils.setField(config, "viewerUsername", "viewer");
+            ReflectionTestUtils.setField(config, "viewerPassword", "viewer123");
+            return config;
+        }
+    }
+
+    @Nested
+    @DisplayName("securityFilterChain")
+    class SecurityFilterChainTest {
+
+        /**
+         * 使用 Spring Security 的 HttpSecurity 构建器测试安全过滤链配置。
+         * 注意：此测试通过构造实际 HttpSecurity 并调用 securityFilterChain
+         * 来验证配置不会抛异常，属于基本冒烟测试。
+         */
+        @Test
+        @DisplayName("securityFilterChain 构建成功不抛异常")
+        void shouldBuildFilterChainWithoutException() throws Exception {
+            SecurityConfig config = createConfigWithDefaults();
+            RateLimitFilter rateLimitFilter = mock(RateLimitFilter.class);
+
+            // HttpSecurity 构造器需要 AuthenticationManagerBuilder 而非 AuthenticationManager
+            HttpSecurity http = new HttpSecurity(
+                mock(ObjectPostProcessor.class),
+                mock(AuthenticationManagerBuilder.class),
+                java.util.Map.of()
+            );
+
+            SecurityFilterChain chain = config.securityFilterChain(http, rateLimitFilter);
+            assertNotNull(chain);
+            assertTrue(chain.getFilters().size() > 0,
+                "过滤链应包含至少一个过滤器");
         }
 
         /** 用默认值创建 SecurityConfig 实例 */

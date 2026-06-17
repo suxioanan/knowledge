@@ -28,7 +28,8 @@ public class KnowledgeAdminController {
     public Map<String, Object> checkFile(@RequestParam String source) {
         List<Document> docs = vectorStore.similaritySearch(
             SearchRequest.builder()
-                .filterExpression("source == '" + source + "'")
+                .filterExpression(new Filter.Expression(Filter.ExpressionType.EQ,
+                    new Filter.Key("source"), new Filter.Value(source)))
                 .topK(1)
                 .build());
         return Map.of(

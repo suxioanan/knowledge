@@ -62,23 +62,29 @@ public class IncrementalSyncService {
                  .forEach(path -> {
                      String filePath = path.toAbsolutePath().toString();
                      currentFiles.add(filePath);
-                     String newHash = md5(filePath);
-                     String oldHash = fileHashIndex.get(filePath);
 
-                     if (oldHash == null) {
-                         // 新增：旧哈希不存在
-                         importService.importSingleFile(filePath);
-                         fileHashIndex.put(filePath, newHash);
-                         result.incrementAdded();
-                     } else if (!oldHash.equals(newHash)) {
-                         // 修改：哈希不一致 → 删旧入新
-                         deleteBySource(filePath);
-                         importService.importSingleFile(filePath);
-                         fileHashIndex.put(filePath, newHash);
-                         result.incrementUpdated();
-                     } else {
-                         // 未变化：跳过
-                         result.incrementSkipped();
+                     try {
+                         String newHash = md5(filePath);
+                         String oldHash = fileHashIndex.get(filePath);
+
+                         if (oldHash == null) {
+                             // 新增：旧哈希不存在
+                             importService.importSingleFile(filePath);
+                             fileHashIndex.put(filePath, newHash);
+                             result.incrementAdded();
+                         } else if (!oldHash.equals(newHash)) {
+                             // 修改：哈希不一致 → 删旧入新
+                             deleteBySource(filePath);
+                             importService.importSingleFile(filePath);
+                             fileHashIndex.put(filePath, newHash);
+                             result.incrementUpdated();
+                         } else {
+                             // 未变化：跳过
+                             result.incrementSkipped();
+                         }
+                     } catch (Exception e) {
+                         log.error("文件处理失败，跳过: {} - {}", filePath, e.getMessage());
+                         // 继续处理下一个文件，不中断整个同步任务
                      }
                  });
         }
