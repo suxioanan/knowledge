@@ -3,6 +3,7 @@ package com.yt.knowledge.service;
 import com.yt.knowledge.model.SyncResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.ai.vectorstore.filter.Filter;
 import org.springframework.stereotype.Service;
@@ -165,6 +166,10 @@ public class IncrementalSyncService {
      * @throws IOException 如果读取失败
      */
     public void loadIndex(String indexPath) throws IOException {
+        if(ObjectUtils.isEmpty(indexPath)){
+            log.warn("未找到索引文件，请检查索引文件路径是否正确");
+            return;
+        }
         Properties props = new Properties();
         try (InputStream is = new FileInputStream(indexPath)) {
             props.load(is);
