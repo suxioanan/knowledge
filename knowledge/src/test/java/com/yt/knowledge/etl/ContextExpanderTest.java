@@ -60,8 +60,8 @@ class ContextExpanderTest {
             assertTrue(result.stream().anyMatch(d -> d.getText().contains("内容1")));
             assertTrue(result.stream().anyMatch(d -> d.getText().contains("内容2")));
             assertTrue(result.stream().anyMatch(d -> d.getText().contains("内容3")));
-            // 应该调用了 2 次 similaritySearch（前后各一次）
-            verify(vectorStore, times(2)).similaritySearch(any(SearchRequest.class));
+            // OR 批查：只调 1 次 similaritySearch
+            verify(vectorStore, times(1)).similaritySearch(any(SearchRequest.class));
         }
 
         @Test
@@ -128,7 +128,7 @@ class ContextExpanderTest {
             // 没有 source + chunk_index 时怎么办... 
             // 实际上 neighborIdx 3 对 chunk2 来说是自身 offset 0 被跳过，所以应该是 4 次调用
             // 但调用顺序取决于循环顺序
-            verify(vectorStore, atLeast(2)).similaritySearch(any(SearchRequest.class));
+            verify(vectorStore, times(1)).similaritySearch(any(SearchRequest.class));
         }
 
         @Test

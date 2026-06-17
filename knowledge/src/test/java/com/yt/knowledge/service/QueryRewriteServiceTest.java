@@ -23,6 +23,9 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class QueryRewriteServiceTest {
 
+    @Mock
+    private ChatClient.Builder chatClientBuilder;
+
     @Mock(answer = org.mockito.Answers.RETURNS_DEEP_STUBS)
     private ChatClient chatClient;
 
@@ -30,7 +33,8 @@ class QueryRewriteServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new QueryRewriteService(chatClient);
+        lenient().when(chatClientBuilder.build()).thenReturn(chatClient);
+        service = new QueryRewriteService(chatClientBuilder);
     }
 
     @Nested
@@ -57,7 +61,7 @@ class QueryRewriteServiceTest {
             String result = service.rewrite("conv-1", "订单创建接口有哪些必填参数？");
             assertEquals("订单创建接口有哪些必填参数？", result);
             // 完整查询不触发 LLM 调用
-            verifyNoInteractions(chatClient);
+            verify(chatClientBuilder, never()).build();
         }
 
         @Test

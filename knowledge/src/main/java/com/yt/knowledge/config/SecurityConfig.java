@@ -103,6 +103,8 @@ public class SecurityConfig {
                 .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
             // 授权规则配置
             .authorizeHttpRequests(auth -> auth
+                // 健康检查（公开，必须在 /actuator/** 之前，否则被截胡）
+                .requestMatchers("/actuator/health").permitAll()
                 // Actuator 监控端点（ADMIN 专用）
                 .requestMatchers("/actuator/**").hasRole("ADMIN")
                 // 知识导入端点（ADMIN 专用）
@@ -111,8 +113,6 @@ public class SecurityConfig {
                 .requestMatchers("/api/knowledge/admin/**").hasRole("ADMIN")
                 // 问答端点（登录即可，USER 和 ADMIN 都可访问）
                 .requestMatchers("/api/knowledge/ask", "/api/knowledge/ask-stream").authenticated()
-                // 健康检查（公开访问，用于负载均衡器探测）
-                .requestMatchers("/actuator/health").permitAll()
                 // 其他所有请求都需要认证
                 .anyRequest().authenticated())
             // 限流过滤器：在最外层，防止恶意请求消耗认证资源
